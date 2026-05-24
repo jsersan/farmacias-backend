@@ -1,11 +1,13 @@
-// find-selectors.js
+// find-selectors-fixed.js
 /**
  * Script automático para encontrar selectores CSS correctos
- * Ejecutar: node find-selectors.js
+ * VERSIÓN CORREGIDA - guarda archivos en directorio actual
+ * Ejecutar: node find-selectors-fixed.js
  */
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const path = require('path');
 
 const WEBS = [
   {
@@ -45,8 +47,8 @@ async function findSelectors(web) {
     console.log('⏳ Esperando carga...');
     await page.waitForTimeout(5000);
 
-    // Tomar screenshot
-    const screenshotPath = `/home/claude/${web.nombre.toLowerCase()}-page.png`;
+    // Tomar screenshot - GUARDADO EN DIRECTORIO ACTUAL
+    const screenshotPath = path.join(process.cwd(), `${web.nombre.toLowerCase()}-page.png`);
     await page.screenshot({ path: screenshotPath, fullPage: true });
     console.log(`📸 Screenshot guardado: ${screenshotPath}`);
 
@@ -145,8 +147,8 @@ async function findSelectors(web) {
       console.log('');
     });
 
-    // Guardar análisis completo
-    const reportPath = `/home/claude/${web.nombre.toLowerCase()}-report.txt`;
+    // Guardar análisis completo - GUARDADO EN DIRECTORIO ACTUAL
+    const reportPath = path.join(process.cwd(), `${web.nombre.toLowerCase()}-report.txt`);
     const report = `
 ANÁLISIS DE SELECTORES: ${web.nombre}
 URL: ${web.url}
@@ -201,6 +203,7 @@ async function main() {
   console.log('║  🔍 BUSCADOR AUTOMÁTICO DE SELECTORES CSS        ║');
   console.log('╚════════════════════════════════════════════════════╝');
   console.log('\nEste script analiza las 3 webs y sugiere selectores.\n');
+  console.log(`📁 Directorio de trabajo: ${process.cwd()}\n`);
 
   const resultados = [];
 
@@ -233,7 +236,7 @@ async function main() {
     }
   });
 
-  console.log('\n📁 ARCHIVOS GENERADOS:\n');
+  console.log('\n📁 ARCHIVOS GENERADOS (en directorio actual):\n');
   WEBS.forEach(web => {
     console.log(`   - ${web.nombre.toLowerCase()}-page.png (screenshot)`);
     console.log(`   - ${web.nombre.toLowerCase()}-report.txt (análisis completo)`);
@@ -242,8 +245,8 @@ async function main() {
   console.log('\n🔧 PRÓXIMO PASO:\n');
   console.log('   1. Revisa los selectores sugeridos arriba');
   console.log('   2. Abre los screenshots para verificar');
-  console.log('   3. Lee los reportes completos');
-  console.log('   4. Actualiza los scrapers con los selectores correctos\n');
+  console.log('   3. Lee los reportes completos con: cat *-report.txt');
+  console.log('   4. Comparte los selectores sugeridos para actualizar scrapers\n');
 }
 
 main().catch(error => {

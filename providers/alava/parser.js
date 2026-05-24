@@ -17,13 +17,11 @@ function parseFarmaciasAlava(farmaciasRaw) {
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
 
-    // Normalizar municipio
     let municipio = farmacia.municipio || '';
     if (municipio.toUpperCase().includes('VITORIA') || municipio.toUpperCase().includes('GASTEIZ')) {
       municipio = 'Vitoria-Gasteiz';
     }
 
-    // Limpiar teléfono
     let telefono = farmacia.telefono || '';
     telefono = telefono.replace(/[^\d+]/g, '');
 

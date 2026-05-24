@@ -17,13 +17,11 @@ function parseFarmaciasBizkaia(farmaciasRaw) {
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
 
-    // Normalizar municipio
     let municipio = farmacia.municipio || '';
     if (municipio.toUpperCase() === 'BILBAO') {
       municipio = 'Bilbao';
     }
 
-    // Limpiar teléfono
     let telefono = farmacia.telefono || '';
     telefono = telefono.replace(/[^\d+]/g, '');
 

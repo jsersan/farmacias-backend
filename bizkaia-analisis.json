@@ -1,0 +1,40 @@
+{
+  "farmaciasEnTexto": [
+    "Farmacias Bizkaia",
+    "Farmacias de guardia",
+    "Farmacias y Servicios",
+    "Farmacias Bizkaia",
+    "Farmacias de guardia",
+    "Farmacias y Servicios",
+    "Farmacias de guardia",
+    "Farmacias de guardia",
+    "CiudadanoFarmacias de guardia",
+    "Farmacias y servicios"
+  ],
+  "elementosConFarmacia": [],
+  "tablas": [
+    {
+      "index": 0,
+      "filas": 7,
+      "primeraFila": "CookieDuraciónDescripción"
+    }
+  ],
+  "formularios": [
+    {
+      "total": 6,
+      "tieneSelect": true,
+      "selects": [
+        {
+          "name": "idmunicipio",
+          "id": "municipio_farmacias_guardia",
+          "opciones": 86
+        },
+        {
+          "name": "zonasalud",
+          "id": "zona_farmacias_guardia",
+          "opciones": 1
+        }
+      ]
+    }
+  ]
+}

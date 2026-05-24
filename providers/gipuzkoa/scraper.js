@@ -3,10 +3,6 @@ const puppeteer = require('puppeteer');
 
 const URL = 'https://www.cofgipuzkoa.eus/ciudadano/farmacias-gipuzkoa/farmacias-de-guardia-2/';
 
-/**
- * Scraper para farmacias de guardia de Gipuzkoa  
- * VERSIÓN MEJORADA con múltiples estrategias
- */
 async function scrapeFarmaciasGipuzkoa() {
   console.log('🔍 [Scraper Gipuzkoa] Iniciando navegador...');
   
@@ -17,128 +13,104 @@ async function scrapeFarmaciasGipuzkoa() {
 
   try {
     const page = await browser.newPage();
-    console.log('✅ [Scraper Gipuzkoa] Navegador iniciado');
     
-    console.log(`🌐 [Scraper Gipuzkoa] Navegando a ${URL}`);
-    await page.goto(URL, { 
-      waitUntil: 'networkidle0',  // Esperar a que NO haya actividad de red
-      timeout: 60000 
+    // Interceptar peticiones para ver si hay APIs JSON
+    const apiData = [];
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('.json') || url.includes('/api/') || 
+          response.headers()['content-type']?.includes('application/json')) {
+        try {
+          const data = await response.json();
+          console.log(`📡 API detectada: ${url}`);
+          apiData.push(data);
+        } catch (e) {}
+      }
     });
-
-    // Esperar a que desaparezca "Cargando..."
-    console.log('⏳ [Scraper Gipuzkoa] Esperando carga de contenido...');
-    try {
-      await page.waitForFunction(
-        () => !document.body.textContent.includes('Cargando...'),
-        { timeout: 30000 }
-      );
-      console.log('✅ [Scraper Gipuzkoa] Contenido cargado');
-    } catch (error) {
-      console.log('⚠️  [Scraper Gipuzkoa] Timeout esperando desaparición de "Cargando..."');
-    }
-
-    // Intentar múltiples estrategias de extracción
-    console.log('📊 [Scraper Gipuzkoa] Intentando extraer datos...');
     
-    // ESTRATEGIA 1: Buscar por secciones de guardias
-    let farmacias = await page.evaluate(() => {
+    await page.goto(URL, { waitUntil: 'networkidle0', timeout: 60000 });
+    
+    // Cerrar cookies
+    await page.waitForTimeout(3000);
+    await page.evaluate(() => {
+      document.querySelectorAll('button').forEach(btn => {
+        if (btn.textContent.toLowerCase().includes('aceptar')) {
+          btn.click();
+        }
+      });
+    });
+    await page.waitForTimeout(3000);
+
+    console.log('📋 [Scraper Gipuzkoa] Extrayendo farmacias de TODA la página...');
+    
+    // Esperar a que cargue contenido dinámico
+    await page.waitForTimeout(5000);
+    
+    const farmacias = await page.evaluate(() => {
       const results = [];
       
-      // Buscar secciones con encabezados de tipo de guardia
-      const headers = [
-        'Farmacias de día',
-        'Farmacias de Refuerzo día',
-        'Farmacias de noche',
-        'Farmacias de Refuerzo noche',
-        'Farmacias voluntarias'
-      ];
+      // ESTRATEGIA 1: Buscar en contenedores guardias
+      const contenedores = document.querySelectorAll('.guardias-container');
+      console.log(`Encontrados ${contenedores.length} contenedores`);
       
-      headers.forEach(headerText => {
-        // Buscar el encabezado
-        const allH2 = document.querySelectorAll('h2, h3, h4');
-        let tipoGuardia = 'diurna';
+      contenedores.forEach(contenedor => {
+        // Buscar TODOS los elementos que tengan texto
+        const elementos = contenedor.querySelectorAll('*');
         
-        if (headerText.toLowerCase().includes('noche')) {
-          tipoGuardia = 'nocturna';
-        } else if (headerText.toLowerCase().includes('refuerzo')) {
-          tipoGuardia = 'refuerzo';
-        } else if (headerText.toLowerCase().includes('voluntaria')) {
-          tipoGuardia = 'voluntaria';
-        }
-        
-        allH2.forEach(h2 => {
-          if (h2.textContent.includes(headerText)) {
-            // Buscar farmacias después de este header
-            let nextElement = h2.nextElementSibling;
+        elementos.forEach(el => {
+          const texto = el.textContent.trim();
+          
+          // Si el texto parece un nombre de farmacia (tiene guion y mayúsculas)
+          if (texto.match(/^[A-ZÁÉÍÓÚÑ\s]+-+[A-ZÁÉÍÓÚÑ\s]+$/i) && 
+              texto.length > 10 && texto.length < 150) {
             
-            while (nextElement && nextElement.tagName !== 'H2' && nextElement.tagName !== 'H3') {
-              // Buscar divs, artículos, o elementos que contengan farmacias
-              const farmElements = nextElement.querySelectorAll('div, article, p, li');
-              
-              farmElements.forEach(el => {
-                const text = el.textContent.trim();
-                
-                // Si el texto tiene al menos 10 caracteres y contiene "FARMACIA" o un teléfono
-                if (text.length > 10 && (text.includes('FARMACIA') || text.match(/\d{9}/))) {
-                  results.push({
-                    nombre: text.split('\n')[0] || text.substring(0, 50),
-                    direccion: '',
-                    telefono: (text.match(/\d{9}/) || [''])[0],
-                    municipio: '',
-                    tipoGuardia: tipoGuardia,
-                    rawText: text
-                  });
-                }
-              });
-              
-              nextElement = nextElement.nextElementSibling;
-            }
+            const partes = texto.split('-');
+            const nombre = partes[0].trim();
+            const municipio = partes.length > 1 ? partes[1].trim() : '';
+            
+            results.push({
+              nombre,
+              direccion: '',
+              telefono: '',
+              municipio,
+              tipoGuardia: 'diurna'
+            });
           }
         });
       });
+      
+      // ESTRATEGIA 2: Si no encontró nada, buscar en TODO el body
+      if (results.length === 0) {
+        const todo = document.body.innerText;
+        const lineas = todo.split('\n');
+        
+        lineas.forEach(linea => {
+          linea = linea.trim();
+          
+          if (linea.match(/^[A-ZÁÉÍÓÚÑ\s]+-+[A-ZÁÉÍÓÚÑ\s]+$/i) && 
+              linea.length > 10 && linea.length < 150 &&
+              !linea.includes('Ciudadano') &&
+              !linea.includes('Colegiado')) {
+            
+            const partes = linea.split('-');
+            results.push({
+              nombre: partes[0].trim(),
+              direccion: '',
+              telefono: '',
+              municipio: partes.length > 1 ? partes[1].trim() : '',
+              tipoGuardia: 'diurna'
+            });
+          }
+        });
+      }
       
       return results;
     });
 
-    // Si no encontró nada, intentar ESTRATEGIA 2: Todo el contenido
-    if (farmacias.length === 0) {
-      console.log('⚠️  [Scraper Gipuzkoa] Estrategia 1 falló, intentando estrategia 2...');
-      
-      farmacias = await page.evaluate(() => {
-        const results = [];
-        const allText = document.body.textContent;
-        
-        // Buscar patrones como "FARMACIA NOMBRE - MUNICIPIO"
-        const lines = allText.split('\n');
-        
-        lines.forEach(line => {
-          line = line.trim();
-          if (line.includes('FARMACIA') && line.length > 10 && line.length < 200) {
-            results.push({
-              nombre: line,
-              direccion: '',
-              telefono: (line.match(/\d{9}/) || [''])[0],
-              municipio: '',
-              tipoGuardia: 'diurna',
-              rawText: line
-            });
-          }
-        });
-        
-        return results;
-      });
-    }
-
     console.log(`✅ [Scraper Gipuzkoa] ${farmacias.length} farmacias extraídas`);
     
-    if (farmacias.length === 0) {
-      // Guardar screenshot para debugging
-      await page.screenshot({ path: '/home/claude/gipuzkoa-debug.png', fullPage: true });
-      console.log('📸 [Scraper Gipuzkoa] Screenshot guardado en gipuzkoa-debug.png');
-      
-      // Imprimir estructura HTML para debugging
-      const bodyHTML = await page.evaluate(() => document.body.innerHTML.substring(0, 1000));
-      console.log('📄 [Scraper Gipuzkoa] HTML (primeros 1000 chars):', bodyHTML);
+    if (apiData.length > 0) {
+      console.log(`📡 Se detectaron ${apiData.length} peticiones JSON`);
     }
     
     await browser.close();

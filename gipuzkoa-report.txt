@@ -1,0 +1,127 @@
+
+ANÁLISIS DE SELECTORES: GIPUZKOA
+URL: https://www.cofgipuzkoa.eus/ciudadano/farmacias-gipuzkoa/farmacias-de-guardia-2/
+Fecha: 2026-05-24T10:07:56.077Z
+
+═══════════════════════════════════════════════════════
+SELECTORES ENCONTRADOS (ordenados por frecuencia)
+═══════════════════════════════════════════════════════
+
+1. .menu-item (25 elementos - Confianza: ALTO)
+2. a (16 elementos - Confianza: ALTO)
+3. .sub-menu (10 elementos - Confianza: ALTO)
+4. .guardias (10 elementos - Confianza: ALTO)
+5. div (7 elementos - Confianza: ALTO)
+6. .container (6 elementos - Confianza: ALTO)
+7. .guardias-container (6 elementos - Confianza: ALTO)
+8. script (5 elementos - Confianza: MEDIO)
+9. .container-full (5 elementos - Confianza: MEDIO)
+10. .subtitle (5 elementos - Confianza: MEDIO)
+
+═══════════════════════════════════════════════════════
+EJEMPLOS DE CONTENIDO
+═══════════════════════════════════════════════════════
+
+Ejemplo 1:
+Selector: .
+Texto: .cookieconsent-optin-preferences,.cookieconsent-optin-statistics,.cookieconsent-optin-marketing,.
+
+Ejemplo 2:
+Selector: .
+Texto: .cookieconsent-optin-preferences,.cookieconsent-optin-statistics,.cookieconsent-optin-marketing,.
+
+Ejemplo 3:
+Selector: .
+Texto: .cookieconsent-optin-preferences,.cookieconsent-optin-statistics,.cookieconsent-optin-marketing,.
+
+
+═══════════════════════════════════════════════════════
+ESTRUCTURA HTML (primeros 2000 caracteres)
+═══════════════════════════════════════════════════════
+
+
+	
+		<div class="wpb-content-wrapper"><div class="wpb_row vc_row-fluid standard-section section  section-no-parallax  stretch   " data-speed="1" style=""><div class="col span_12 color-dark left">
+	<div class="vc_col-sm-12 wpb_column column_container col no-padding color-dark" style="" data-animation="" data-delay="">
+		<div class="wpb_wrapper">
+			
+	<div class="wpb_raw_code wpb_raw_html wpb_content_element">
+		<div class="wpb_wrapper">
+			<style>
+  .guardias {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    overflow: hidden;
+  }
+  .subtitle {
+    color: #7a1f5e;
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    text-align: left;
+    text-decoration: underline;
+  }
+  .guardias-container {
+    display: flex;
+    flex-direction: column;
+  }
+  .farmacia {
+    border-bottom: 1px solid #eee;
+    padding: 10px;
+    margin: 10px 0;
+    overflow: hidden;
+  }
+  .farmacia:last-child {
+    border-bottom: none;
+  }
+  .farmacia h3 {
+    color: #93bc2c;
+    margin: 0 0 5px 0;
+    font-size: 1.6em;
+  }
+  .farmacia p {
+    color: #666;
+    margin: 4px 0;
+    font-size: 1.2em;
+  }
+
+  .festivosLocalesContainer {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 5px;
+    background-color: rgba(255, 0, 0, 0.15);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+</style>
+<div id="loader" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(255, 255, 255, 0.8);
+    z-index: 9999;
+  ">
+  <div class="spinner-container">
+    <div class="spinner"></div>
+    Cargando...
+  </div>
+</div>
+<div id="buscador" style="
+    margin-top: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  ">
+  <div style="
+      display: flex;
+      flex-direction: row

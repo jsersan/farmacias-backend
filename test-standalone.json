@@ -1,0 +1,18 @@
+{
+  "alava": [
+    {
+      "nombre": "Farmacias de guardia de Álava",
+      "direccion": "",
+      "telefono": "945262068",
+      "municipio": "Álava"
+    }
+  ],
+  "bizkaia": [
+    {
+      "nombre": "Dónde Estamos",
+      "direccion": "",
+      "telefono": "",
+      "municipio": "Bizkaia"
+    }
+  ]
+}

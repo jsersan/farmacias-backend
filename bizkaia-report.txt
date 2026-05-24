@@ -1,0 +1,60 @@
+
+ANÁLISIS DE SELECTORES: BIZKAIA
+URL: https://www.cofbizkaia.eus/farmacia_de_guardia/
+Fecha: 2026-05-24T10:08:11.473Z
+
+═══════════════════════════════════════════════════════
+SELECTORES ENCONTRADOS (ordenados por frecuencia)
+═══════════════════════════════════════════════════════
+
+1. .container (10 elementos - Confianza: ALTO)
+2. a (10 elementos - Confianza: ALTO)
+3. .menu-item (9 elementos - Confianza: ALTO)
+4. .menu (6 elementos - Confianza: ALTO)
+5. .sixteen (4 elementos - Confianza: MEDIO)
+6. .sub-menu (4 elementos - Confianza: MEDIO)
+7. .pageFarmaciasGuardia (4 elementos - Confianza: MEDIO)
+8. div (4 elementos - Confianza: MEDIO)
+9. .csstransforms (2 elementos - Confianza: BAJO)
+10. title (2 elementos - Confianza: BAJO)
+
+═══════════════════════════════════════════════════════
+EJEMPLOS DE CONTENIDO
+═══════════════════════════════════════════════════════
+
+Ejemplo 1:
+Selector: .csstransforms
+Texto: farmacias de guardia – COFBi /* You can add
+
+Ejemplo 2:
+Selector: .csstransforms
+Texto: farmacias de guardia – COFBi /* You can add
+
+Ejemplo 3:
+Selector: title
+Texto: farmacias de guardia – COFBi
+
+
+═══════════════════════════════════════════════════════
+ESTRUCTURA HTML (primeros 2000 caracteres)
+═══════════════════════════════════════════════════════
+
+
+         <form action="/farmacia_de_guardia/" method="GET" class="form_empleo buscador">
+            <div>
+                <label>
+                    <span>Municipio</span>
+                                        <select id="municipio_farmacias_guardia" name="idmunicipio">
+                        <option value="" selected="selected">Selecciona</option>
+                                                    <option data_id="48001" data_municipio="ABADIÑO" value="48001">ABADIÑO</option>
+                                                        <option data_id="48002" data_municipio="ABANTO-ZIERBENA" value="48002">ABANTO-ZIERBENA</option>
+                                                        <option data_id="48912" data_municipio="ALONSOTEGI" value="48912">ALONSOTEGI</option>
+                                                        <option data_id="48003" data_municipio="AMOREBIETA-ETXANO" value="48003">AMOREBIETA-ETXANO</option>
+                                                        <option data_id="48093" data_municipio="AREATZA" value="48093">AREATZA</option>
+                                                        <option data_id="48011" data_municipio="ARRIGORRIAGA" value="48011">ARRIGORRIAGA</option>
+                                                        <option data_id="48480" data_municipio="ARRIGORRIAGA (ABUSU/LA PEÑA)" value="48480">ARRIGORRIAGA (ABUSU/LA PEÑA)</option>
+                                                        <option data_id="48023" data_municipio="ARTEA - CASTILLO ELEJ." value="48023">ARTEA - CASTILLO ELEJ.</option>
+                                                        <option data_id="48008" data_municipio="ARTZENTALES" value="48008">ARTZENTALES</option>
+                                                        <option data_id="48091" data_municipio="ATXONDO" value="48091">ATXONDO</option>
+                                                        <option data_id="48012" data_municipio="BAKIO" value="48012">BAKIO</option>
+                       
