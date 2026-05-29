@@ -1,33 +1,26 @@
 {
   "name": "farmacias-guardia-backend",
-  "version": "1.0.0",
-  "description": "Backend scraper para farmacias de guardia Euskadi",
+  "version": "2.0.0",
+  "description": "Backend para farmacias de guardia Euskadi (sin Puppeteer en producción)",
   "main": "server-proxy.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server-proxy.js",
-    "proxy": "node server-proxy.js",
-    "test": "node tests/parse.test.js",
-    "test-scrapers": "node test-scrapers.js",
-    "validate": "node validate-endpoints.js"
+    "dev":   "node server-proxy.js"
   },
   "dependencies": {
-    "axios": "^1.16.1",
-    "cors": "^2.8.6",
-    "express": "^4.22.2",
-    "node-cache": "^5.1.2",
-    "puppeteer": "^21.11.0",
-    "uuid": "^9.0.1"
+    "axios":      "^1.6.0",
+    "cors":       "^2.8.5",
+    "express":    "^4.18.2",
+    "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^21.11.0"
   },
   "engines": {
     "node": "20.x"
   },
-  "keywords": [
-    "farmacias",
-    "guardia",
-    "euskadi",
-    "scraper"
-  ],
+  "keywords": ["farmacias", "guardia", "euskadi"],
   "author": "",
   "license": "MIT"
 }
