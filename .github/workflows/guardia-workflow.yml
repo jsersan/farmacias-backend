@@ -16,14 +16,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Instalar Chrome
-        run: npx puppeteer browsers install chrome
-
-      - name: Instalar Puppeteer
+      - name: Instalar dependencias
         run: npm install puppeteer
 
       - name: Ejecutar scrapers
         run: node scraper-runner.js
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: false
 
       - name: Publicar en Gist
         uses: exuanbo/actions-deploy-gist@v1
