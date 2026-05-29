@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Backend scraper para farmacias de guardia Euskadi",
   "main": "server-proxy.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server-proxy.js",
     "proxy": "node server-proxy.js",
@@ -19,7 +20,7 @@
     "uuid": "^9.0.1"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": "20.x"
   },
   "keywords": [
     "farmacias",
