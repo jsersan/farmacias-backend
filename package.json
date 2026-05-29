@@ -1,12 +1,10 @@
 {
   "name": "farmacias-guardia-backend",
   "version": "2.0.0",
-  "description": "Backend para farmacias de guardia Euskadi (sin Puppeteer en producción)",
   "main": "server-proxy.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server-proxy.js",
-    "dev":   "node server-proxy.js"
+    "start": "node server-proxy.js"
   },
   "dependencies": {
     "axios":      "^1.6.0",
@@ -17,10 +15,5 @@
   "devDependencies": {
     "puppeteer": "^21.11.0"
   },
-  "engines": {
-    "node": "20.x"
-  },
-  "keywords": ["farmacias", "guardia", "euskadi"],
-  "author": "",
-  "license": "MIT"
+  "engines": { "node": "20.x" }
 }
