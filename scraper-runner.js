@@ -246,12 +246,12 @@ async function scrapeAlava(page) {
 
 
 /* ═══════════════════════════════════════════════════════════════ *
- *  BIZKAIA  —  formulario GET en cofbizkaia.eus                  *
+ *  BIZKAIA  —  formulario en cofbizkaia.eus                      *
  *                                                                *
- *  v3: navega directamente a la URL de resultados (GET) para     *
- *  cada municipio y parsea los bloques de texto con etiquetas     *
- *  «Dirección: / Población: / Teléfono:» en vez de depender de  *
- *  celdas de tabla (que no existen en la web actual).             *
+ *  v3b: selecciona municipio ▸ clic en Buscar ▸ espera recarga   *
+ *  ▸ extrae bloques de texto con etiquetas Dirección/Teléfono.   *
+ *  Si la extracción por texto falla, usa la tabla como fallback  *
+ *  y re-parsea el contenido de cada celda.                       *
  * ═══════════════════════════════════════════════════════════════ */
 
 async function scrapeBizkaia(page) {
@@ -264,12 +264,12 @@ async function scrapeBizkaia(page) {
     else req.continue();
   });
 
-  // 1) Cargar página del formulario para obtener la lista de municipios
+  // 1) Cargar la página del formulario
   await page.goto('https://www.cofbizkaia.eus/farmacia_de_guardia/', {
-    waitUntil: 'domcontentloaded',
+    waitUntil: 'networkidle2',
     timeout: TIMEOUT
   });
-  await delay(3000);
+  await delay(4000);
 
   const municipios = await page.evaluate(() => {
     const sel = document.querySelector('#municipio_farmacias_guardia');
@@ -290,77 +290,80 @@ async function scrapeBizkaia(page) {
   console.log(`🔴 BIZKAIA: ${municipios.length} municipios`);
 
   const resultado = [];
-  const fecha     = fechaDMY();
 
-  // 2) Para cada municipio, navegar a la URL de resultados y parsear
+  // 2) Para cada municipio: seleccionar → enviar formulario → parsear
   for (let i = 0; i < municipios.length; i++) {
     const m = municipios[i];
     try {
-      const url =
-        'https://www.cofbizkaia.eus/farmacia_de_guardia/' +
-        '?idmunicipio=' + encodeURIComponent(m.id) +
-        '&fecha_guardia=' + encodeURIComponent(fecha) +
-        '&submitForm=1' +
-        '&orderby=farmacia&order=desc' +
-        '&pagetype=farmacias_de_guardia';
+      // Seleccionar municipio en el dropdown
+      await page.select('#municipio_farmacias_guardia', m.id);
+      await delay(300);
 
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      // Clic en "Buscar" y esperar recarga de página
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }),
+        page.click('#submitForm')
+      ]);
       await delay(1000);
 
-      // 3) Extraer bloques de texto con datos de farmacia
-      const bloques = await page.evaluate(() => {
+      // 3) Extraer farmacias — doble estrategia
+      const rawBlocks = await page.evaluate((municipioNombre, idx) => {
+        const bloques = [];
+
+        /* ── Estrategia A: bloques de texto con etiquetas ──────── */
         const el = document.querySelector('#content, .farmaciasGuardia');
-        if (!el) return [];
+        if (el) {
+          const texto  = el.innerText || '';
+          const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+          const esEtiqueta = /^(Dirección|Población|Horario|Teléfono|Zona):/;
+          const ignorar    = /^(Municipio|Fecha|Buscar|Selecciona|COFBI|cookie|Acceso|©)/i;
 
-        const texto  = el.innerText || '';
-        const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
-
-        // Cada farmacia sigue el patrón:
-        //   NOMBRE
-        //   Dirección: …
-        //   Población: …
-        //   Horario: …
-        //   Teléfono: …
-        //   Zona: …
-        const etiquetas = /^(Dirección|Población|Horario|Teléfono|Zona):/;
-        const ignorar   = /^(Municipio|Fecha|Buscar|Selecciona|COFBI|cookie|Acceso|©|Colegiación|Farmacias Bizkaia|Farmacias de guardia|Farmacias y Servicios|Quienes somos|Ventanilla|Noticias|Espacios|Canal|Publicaciones|Contacto|Colegio Oficial|Aviso Legal|Politica|Dónde Estamos|Cómo llegar|Horario:|Tfno|colegio@|Junta|Equipo|Comisiones|Solicitud|Qué te ofrecemos|Formación|Biblioteca|Consejo sanitario|Directorio|Sugerencias|Estatutos|Memoria|Cuentas|Registro|Compromiso|Nuestro equipo|Transparencia|Información|Misión|Bolsa|Actividades|Calendario|Servicios|Recuérdame|Acceder|Username|E-mail|Password|Confirm|REGISTER|Contraseña|OBTENER|Volver|Obtener)/i;
-
-        const bloques   = [];
-        let   bloque    = [];
-
-        for (let i = 0; i < lineas.length; i++) {
-          const l = lineas[i];
-
-          if (l.startsWith('Dirección:') && bloque.length > 0) {
-            // Acumular esta línea y las siguientes etiquetadas
-            bloque.push(l);
-            for (let j = i + 1; j < lineas.length; j++) {
-              if (etiquetas.test(lineas[j])) {
-                bloque.push(lineas[j]);
-                i = j;
-              } else {
-                break;
+          let bloque = [];
+          for (let k = 0; k < lineas.length; k++) {
+            const l = lineas[k];
+            if (l.startsWith('Dirección:') && bloque.length > 0) {
+              bloque.push(l);
+              for (let j = k + 1; j < lineas.length; j++) {
+                if (esEtiqueta.test(lineas[j])) { bloque.push(lineas[j]); k = j; }
+                else break;
               }
+              bloques.push(bloque.join('\n'));
+              bloque = [];
+            } else if (!esEtiqueta.test(l) && !ignorar.test(l) && l.length > 4) {
+              bloque = [l];
             }
-            bloques.push(bloque.join('\n'));
-            bloque = [];
-
-          } else if (!etiquetas.test(l) && !ignorar.test(l) && l.length > 4) {
-            // Posible nombre de farmacia → empieza nuevo bloque
-            bloque = [l];
           }
         }
+
+        /* ── Estrategia B (fallback): celdas de tabla ──────────── */
+        if (bloques.length === 0) {
+          document.querySelectorAll('table tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 1) return;
+            const texto = (cells[0].textContent || '').trim();
+            if (texto.includes('Dirección:') && texto.length > 20) {
+              bloques.push(texto);
+            }
+          });
+        }
+
+        // Debug: log del primer municipio para ver qué hay
+        if (idx === 0 && bloques.length === 0 && el) {
+          const muestra = (el.innerText || '').substring(0, 500);
+          console.log('[DEBUG Bizkaia] Primer municipio, texto:', muestra);
+        }
+
         return bloques;
-      });
+      }, m.nombre, i);
 
       // 4) Parsear cada bloque en Node
-      for (const raw of bloques) {
+      for (const raw of rawBlocks) {
         const parsed = parseBizkaiaTexto(raw, m.nombre);
         if (parsed) resultado.push(parsed);
       }
 
-      if (bloques.length > 0) {
-        console.log(`   └─ ${m.nombre}: ${bloques.length}`);
+      if (rawBlocks.length > 0) {
+        console.log(`   └─ ${m.nombre}: ${rawBlocks.length}`);
       }
     } catch (e) {
       if (!e.message.includes('Timeout') && !e.message.includes('ERR_ABORTED')) {
