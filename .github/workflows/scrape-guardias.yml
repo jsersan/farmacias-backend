@@ -1,0 +1,43 @@
+# .github/workflows/scrape-guardias.yml
+# ─────────────────────────────────────────────────────────────────
+# Ejecuta los scrapers de farmacias de guardia y publica el
+# resultado en un Gist público que el backend (Render) lee.
+# ─────────────────────────────────────────────────────────────────
+name: Scrape farmacias de guardia
+
+on:
+  # Ejecutar automáticamente a las 6:00 y 14:00 hora española (4:00 y 12:00 UTC)
+  schedule:
+    - cron: '0 4,12 * * *'
+
+  # Permitir ejecución manual desde GitHub (botón "Run workflow")
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # 1. Descargar el código del repositorio
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # 2. Instalar Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Instalar dependencias (incluye puppeteer de devDependencies)
+      #    Puppeteer descargará su propia copia de Chrome automáticamente
+      - name: Instalar dependencias
+        run: npm ci
+
+      # 4. Ejecutar los scrapers y publicar en Gist
+      - name: Ejecutar scrapers
+        run: node scripts/scrape-and-publish.js
+        env:
+          GIST_ID:  ${{ secrets.GIST_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
