@@ -2,8 +2,8 @@ name: Scraper Farmacias de Guardia
 
 on:
   schedule:
-    - cron: '0 4,12 * * *'
-  workflow_dispatch:
+    - cron: '0 4,12,20 * * *'     # 06:00, 14:00, 22:00 hora España (CEST)
+  workflow_dispatch:                # permite lanzar manualmente
 
 jobs:
   scrape:
@@ -19,14 +19,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Instalar dependencias
-        run: npm ci
+      - name: Instalar Puppeteer
+        run: npm install puppeteer@^21
 
-      - name: Descargar Chrome para Puppeteer
-        run: npx puppeteer browsers install chrome
+      - name: Ejecutar scraper
+        run: node scraper-runner.js
 
-      - name: Ejecutar scrapers
-        run: node scripts/scrape-and-publish.js
-        env:
-          GIST_ID:  ${{ secrets.GIST_ID }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Publicar en Gist
+        uses: exuanbo/actions-deploy-gist@v1
+        with:
+          token: ${{ secrets.GIST_TOKEN }}
+          gist_id: ${{ secrets.GIST_ID }}
+          file_path: guardias-output.json
+          file_type: text
