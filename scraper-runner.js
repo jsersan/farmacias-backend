@@ -296,11 +296,15 @@ async function scrapeBizkaia(page) {
         const html = document.body.innerHTML;
 
         // Teléfono: <a href="tel:+34XXXXXXXXX">
+        // Quitamos el prefijo internacional y nos quedamos con los 9 dígitos finales.
         let telefono = '';
         const telLink = document.querySelector('a[href^="tel:"]');
         if (telLink) {
-          const m = (telLink.getAttribute('href') || '').match(/\d{9}/);
-          telefono = m ? m[0] : '';
+          let soloDigitos = (telLink.getAttribute('href') || '').replace(/\D/g, '');
+          if (soloDigitos.startsWith('34') && soloDigitos.length > 9) {
+            soloDigitos = soloDigitos.slice(2);   // quitar prefijo de España
+          }
+          telefono = soloDigitos.slice(-9);        // últimos 9 dígitos
         }
 
         // Coordenadas: iframemapa1.php?lat=XX.XX&lon=YY.YY  (el & puede venir como &amp;)
