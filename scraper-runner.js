@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * scraper-runner.js  v3
+ * scraper-runner.js  v5
  * ─────────────────────────────────────────────────────────────────
  * Se ejecuta en GitHub Actions (IPs limpias, sin bloqueo de WAF).
- * Genera  guardias-output.json  que el backend lee vía Gist público.
+ * Genera  guardias-output.json  que el frontend lee vía Gist público.
  *
- * Correcciones respecto a v2:
- *  ✅  Bizkaia  — parsing correcto (nombre/dirección/teléfono separados)
- *  ✅  Gipuzkoa — deduplicación (eliminados ~73 % de entradas repetidas)
- *  ✅  Usa setTimeout estándar (waitForTimeout eliminado en Puppeteer 22+)
+ * Cambios respecto a v4:
+ *  ✅  Bizkaia — nueva fuente farmacias.es (listado + fichas con
+ *               teléfono y coordenadas). Las webs oficiales del COF
+ *               Bizkaia no son rascables. Fuente NO oficial.
+ *  ✅  Álava    — selectores reales (li.fc-component-text + .ft-td)
+ *  ✅  Gipuzkoa — sin cambios (API interna pretools, funciona)
  * ─────────────────────────────────────────────────────────────────
  */
 
@@ -19,7 +21,7 @@ const TIMEOUT = parseInt(process.env.TIMEOUT_MS || '45000', 10);
 const delay   = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /* ═══════════════════════════════════════════════════════════════ *
- *  HELPERS                                                       *
+ *  HELPERS                                                          *
  * ═══════════════════════════════════════════════════════════════ */
 
 /** Fecha YYYY-MM-DD (para la API de Gipuzkoa). */
@@ -29,7 +31,7 @@ function fechaISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Fecha dd/mm/yyyy (para el formulario GET de Bizkaia). */
+/** Fecha dd/mm/yyyy (por si se necesita en formularios GET). */
 function fechaDMY() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -47,54 +49,9 @@ function dedup(arr, keyFn) {
   });
 }
 
-/**
- * Parsea un bloque de texto de Bizkaia con esta estructura:
- *
- *   APELLIDO APELLIDO, NOMBRE
- *   Dirección: CALLE, NÚM
- *   Población: MUNICIPIO
- *   Horario:   09:00 - 22:00
- *   Teléfono:  94 XXXXXXX
- *   Zona:      ZONA-NOMBRE
- *
- * Devuelve un objeto normalizado o null si el bloque no es válido.
- */
-function parseBizkaiaTexto(texto, municipioFallback) {
-  const limpio = texto
-    .replace(/\t+/g, ' ')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
-
-  const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lineas.length < 2) return null;
-
-  // La primera línea que NO sea una etiqueta es el nombre
-  let nombre = '';
-  for (const l of lineas) {
-    if (!/^(Dirección|Población|Horario|Teléfono|Zona):/i.test(l)) {
-      nombre = l;
-      break;
-    }
-  }
-  if (!nombre || nombre.length < 4) return null;
-
-  const campo = etiqueta => {
-    const m = limpio.match(new RegExp(etiqueta + ':\\s*(.+)', 'i'));
-    return m ? m[1].trim() : '';
-  };
-
-  return {
-    nombre,
-    direccion: campo('Dirección'),
-    municipio: campo('Población') || municipioFallback,
-    telefono:  campo('Teléfono').replace(/[^\d]/g, ''),
-    provincia: 'BIZKAIA'
-  };
-}
-
 
 /* ═══════════════════════════════════════════════════════════════ *
- *  GIPUZKOA  —  API interna cofgipuzkoa.pretools.net             *
+ *  GIPUZKOA  —  API interna cofgipuzkoa.pretools.net                *
  * ═══════════════════════════════════════════════════════════════ */
 
 async function scrapeGipuzkoa(page) {
@@ -172,7 +129,9 @@ async function scrapeGipuzkoa(page) {
 
 
 /* ═══════════════════════════════════════════════════════════════ *
- *  ÁLAVA  —  plugin WP Google Maps en cofalava.org               *
+ *  ÁLAVA  —  cofalava.org  (listado .ft-td del plugin WP Maps)      *
+ *  El listado completo aparece sin interacción al cargar la página. *
+ *  VALIDADO: 13 farmacias únicas en prueba local.                   *
  * ═══════════════════════════════════════════════════════════════ */
 
 async function scrapeAlava(page) {
@@ -183,226 +142,209 @@ async function scrapeAlava(page) {
     timeout: TIMEOUT
   });
 
-  // Cookies
+  // Cookies (si aparecen)
   try {
     await page.waitForSelector('[aria-label="Aceptar todo"]', { timeout: 4000 });
     await page.click('[aria-label="Aceptar todo"]');
-    await delay(2000);
-  } catch (_) {}
+    await delay(1500);
+  } catch (_) { /* sin banner */ }
 
-  // Esperar a que el mapa cargue
+  // Esperar a que el listado de farmacias se renderice
   try {
-    await page.waitForSelector(
-      '.wpgmp_locations, .place_title, table tr td',
-      { timeout: 20000 }
-    );
+    await page.waitForSelector('li.fc-component-text', { timeout: 20000 });
   } catch (_) {
-    console.log('🟢 ÁLAVA: sin selector estándar, intento genérico...');
+    console.log('🟢 ÁLAVA: no aparecieron filas li.fc-component-text');
+    return [];
   }
-  await delay(3000);
+  await delay(2000); // margen para que carguen todas
 
   const farmacias = await page.evaluate(() => {
+    const limpiarDireccion = txt =>
+      txt.replace(/\s*Cómo ir\s*$/i, '').replace(/\s+/g, ' ').trim();
+
+    const primerTelefono = txt => {
+      const m = txt.match(/\d{9}/);          // primer número de 9 dígitos
+      return m ? m[0] : '';
+    };
+
+    const filas = Array.from(document.querySelectorAll('li.fc-component-text'));
     const results = [];
 
-    // Estrategia 1: plugin WP Google Maps Pro
-    document.querySelectorAll('.wpgmp_locations').forEach(item => {
-      const nombreEl = item.querySelector('.place_title');
-      if (!nombreEl) return;
-      const tds = item.querySelectorAll('.ft-td');
+    filas.forEach(li => {
+      const celdas = Array.from(li.querySelectorAll('.ft-td'))
+        .map(td => td.textContent.replace(/\s+/g, ' ').trim());
+
+      // Estructura: [Farmacia, Dirección, Población, Teléfono, Horario, extra]
+      if (celdas.length < 4) return;
+
+      const nombre = celdas[0];
+      if (!nombre || /^farmacia$/i.test(nombre)) return;   // descartar cabecera
+
       results.push({
-        nombre:    nombreEl.textContent.trim(),
-        direccion: tds[1]
-          ? tds[1].textContent.replace(/\s+/g, ' ').replace(/Cómo ir/g, '').trim()
-          : '',
-        municipio: tds[2] ? tds[2].textContent.trim() : '',
-        telefono:  tds[3] ? tds[3].textContent.replace(/\D/g, '') : '',
+        nombre,
+        direccion: limpiarDireccion(celdas[1] || ''),
+        municipio: celdas[2] || 'Álava',
+        telefono:  primerTelefono(celdas[3] || ''),
         provincia: 'ARABA'
       });
     });
-    if (results.length > 0) return results;
 
-    // Estrategia 2: tabla HTML genérica
-    document.querySelectorAll('table tr').forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 2) {
-        const nombre = cells[0].textContent.trim();
-        if (nombre.length > 3 && /farmacia/i.test(nombre)) {
-          results.push({
-            nombre,
-            direccion: cells[1]?.textContent.trim() || '',
-            municipio: cells[2]?.textContent.trim() || 'Álava',
-            telefono:  cells[3]?.textContent.replace(/\D/g, '') || '',
-            provincia: 'ARABA'
-          });
-        }
-      }
-    });
     return results;
   });
 
-  console.log(`✅ ÁLAVA: ${farmacias.length} farmacias`);
-  return farmacias;
-}
+  // Deduplicar farmacias que aparecen por varios turnos (mismo nombre+municipio)
+  const unicos = dedup(farmacias, f =>
+    `${f.nombre.toLowerCase()}|${f.municipio.toLowerCase()}`
+  );
 
-
-/* ═══════════════════════════════════════════════════════════════ *
- *  BIZKAIA  —  v3c                                               *
- *                                                                *
- *  Intenta cofbizkaia.net (ASP.NET con tablas) primero y cae     *
- *  a cofbizkaia.eus como fallback.                               *
- *  Busca cualquier elemento del DOM que contenga "Dirección:"    *
- *  y "Teléfono:", lo extrae y lo parsea con las etiquetas.       *
- * ═══════════════════════════════════════════════════════════════ */
-
-async function scrapeBizkaia(page) {
-  console.log('\n🔴 BIZKAIA: navegando...');
-
-  await page.setRequestInterception(true);
-  page.on('request', req => {
-    if (['image', 'font', 'media'].includes(req.resourceType())) req.abort();
-    else req.continue();
-  });
-
-  // 1) Intentar .net (ASP.NET) primero, luego .eus (WordPress)
-  const sitios = [
-    { url: 'https://www.cofbizkaia.net/Sec_DF/wf_DirectorioFarmaciaGuardialst.aspx?IdMenu=52', tipo: 'net' },
-    { url: 'https://www.cofbizkaia.eus/farmacia_de_guardia/', tipo: 'eus' }
-  ];
-
-  let sitioTipo = null;
-  for (const s of sitios) {
-    try {
-      await page.goto(s.url, { waitUntil: 'networkidle2', timeout: 30000 });
-      sitioTipo = s.tipo;
-      console.log(`🔴 BIZKAIA: cargado (${s.tipo}) ${s.url}`);
-      break;
-    } catch (_) {
-      console.log(`🔴 BIZKAIA: falló ${s.url}`);
-    }
-  }
-  if (!sitioTipo) { console.warn('🔴 BIZKAIA: ninguna URL disponible'); return []; }
-  await delay(4000);
-
-  // 2) Encontrar dropdown de municipios
-  const posiblesDropdowns = [
-    '#ddlMunicipio',
-    '#ctl00_cphMainContent_ddlMunicipio',
-    '#municipio_farmacias_guardia',
-    'select[name*="municipio" i]',
-    'select[name*="Municipio" i]'
-  ];
-  let dropdownSel = null;
-  for (const s of posiblesDropdowns) {
-    try { await page.waitForSelector(s, { timeout: 3000 }); dropdownSel = s; break; }
-    catch (_) {}
-  }
-  if (!dropdownSel) { console.warn('🔴 BIZKAIA: dropdown no encontrado'); return []; }
-  console.log(`🔴 BIZKAIA: dropdown → ${dropdownSel}`);
-
-  // 3) Lista de municipios
-  const municipios = await page.evaluate(sel => {
-    const dd = document.querySelector(sel);
-    if (!dd) return [];
-    return Array.from(dd.options)
-      .filter(o => o.value && o.value !== '' && o.value !== '0')
-      .map(o => ({ id: o.value, nombre: o.textContent.trim() }));
-  }, dropdownSel);
-  console.log(`🔴 BIZKAIA: ${municipios.length} municipios`);
-
-  const resultado = [];
-
-  for (let i = 0; i < municipios.length; i++) {
-    const m = municipios[i];
-    try {
-      // Seleccionar municipio
-      await page.select(dropdownSel, m.id);
-
-      // ASP.NET hace postback automático al cambiar el select;
-      // WordPress necesita clic en submit + navegación.
-      if (sitioTipo === 'eus') {
-        try {
-          await Promise.all([
-            page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }),
-            page.click('#submitForm')
-          ]);
-        } catch (_) {}
-      } else {
-        // .net: esperar postback automático o manual
-        try { await page.waitForNavigation({ timeout: 8000 }); }
-        catch (_) {}
-      }
-      await delay(1500);
-
-      // 4) Extraer — buscar CUALQUIER elemento con "Dirección:" + "Teléfono:"
-      const { bloques, debug } = await page.evaluate((municipioNombre, isFirst) => {
-        const bloques = [];
-
-        // Recorrer todos los td, div, article, li, p, section
-        const candidatos = document.querySelectorAll('td, div, article, li, p, section, span');
-        for (const el of candidatos) {
-          const t = (el.innerText || el.textContent || '');
-          if (t.includes('Dirección:') && t.includes('Teléfono:') &&
-              t.length > 30 && t.length < 2000 && el.children.length < 20) {
-            bloques.push(t.replace(/\t+/g, ' ').trim());
-          }
-        }
-
-        // Deduplicar: quedarse con los bloques más cortos (hijos, no padres)
-        let unicos = bloques;
-        if (bloques.length > 1) {
-          bloques.sort((a, b) => a.length - b.length);
-          unicos = [];
-          for (const b of bloques) {
-            if (!unicos.some(u => b.includes(u) && b.length > u.length + 10)) {
-              unicos.push(b);
-            }
-          }
-        }
-
-        // Debug para el primer municipio
-        let debug = '';
-        if (isFirst) {
-          const body = document.querySelector('#content, .farmaciasGuardia, body');
-          const txt  = (body?.innerText || '').replace(/\s+/g, ' ');
-          debug = `[len=${txt.length}] ${txt.substring(0, 600)}`;
-        }
-
-        return { bloques: unicos, debug };
-      }, m.nombre, i === 0);
-
-      // Log debug del primer municipio
-      if (debug) console.log(`🔍 DEBUG primer municipio (${m.nombre}):\n   ${debug}\n`);
-
-      // 5) Parsear cada bloque
-      for (const raw of bloques) {
-        const parsed = parseBizkaiaTexto(raw, m.nombre);
-        if (parsed) resultado.push(parsed);
-      }
-
-      if (bloques.length > 0) {
-        console.log(`   └─ ${m.nombre}: ${bloques.length}`);
-      }
-    } catch (e) {
-      if (i === 0) console.error(`   └─ Error ${m.nombre}:`, e.message);
-    }
-  }
-
-  const unicos = dedup(resultado, f => `${f.nombre}|${f.municipio}`);
   console.log(
-    `✅ BIZKAIA: ${unicos.length} farmacias únicas ` +
-    `(descartadas ${resultado.length - unicos.length} duplicadas)`
+    `✅ ÁLAVA: ${unicos.length} farmacias únicas ` +
+    `(descartadas ${farmacias.length - unicos.length} duplicadas por turno)`
   );
   return unicos;
 }
 
 
 /* ═══════════════════════════════════════════════════════════════ *
- *  MAIN                                                          *
+ *  BIZKAIA  —  v5  (fuente: farmacias.es)                           *
+ *                                                                   *
+ *  Las webs oficiales del COF Bizkaia no exponen los datos de forma *
+ *  rascable (la .net da timeout; la .eus carga por JS sin datos en  *
+ *  el HTML). Usamos farmacias.es/12-horas/bizkaia como fuente       *
+ *  alternativa (NO oficial): su HTML es estático y cada farmacia    *
+ *  enlaza a una ficha con teléfono y coordenadas.                   *
+ *                                                                   *
+ *  Estrategia:                                                      *
+ *   1) Leer el listado (nombre, dirección, municipio, CP, enlace).  *
+ *   2) Entrar en cada ficha → teléfono (tel:) + lat/lon (iframe).   *
+ *                                                                   *
+ *  El teléfono permite que el frontend cruce con el directorio de   *
+ *  842 farmacias y coloque el marcador. lat/lon van como respaldo.  *
+ * ═══════════════════════════════════════════════════════════════ */
+
+async function scrapeBizkaia(page) {
+  console.log('\n🔴 BIZKAIA: navegando a farmacias.es...');
+
+  await page.goto('https://www.farmacias.es/12-horas/bizkaia', {
+    waitUntil: 'networkidle2',
+    timeout: TIMEOUT
+  });
+
+  // Cookies (si aparecen)
+  try {
+    await page.waitForSelector('a.acepto, .cookie-accept, #aceptar-cookies', { timeout: 3000 });
+    await page.click('a.acepto, .cookie-accept, #aceptar-cookies');
+    await delay(1000);
+  } catch (_) { /* sin banner o distinto */ }
+
+  // 1) Extraer el listado: nombre, dirección, municipio, CP y enlace a la ficha
+  const listado = await page.evaluate(() => {
+    const limpiar = t => (t || '').replace(/\s+/g, ' ').trim();
+    const items = [];
+
+    document.querySelectorAll('a[href*="/bizkaia/"]').forEach(a => {
+      const href = a.getAttribute('href') || '';
+      // Solo fichas de farmacia: /bizkaia/{municipio}/{slug-NUMERO}
+      if (!/\/bizkaia\/[^/]+\/[^/]+-\d+$/.test(href)) return;
+
+      const nombre = limpiar(a.textContent);
+      if (!nombre || nombre.length < 3) return;
+
+      const bloque = a.closest('div, article, li');
+      const texto  = bloque ? limpiar(bloque.innerText) : '';
+
+      // "48011 BILBAO - Bizkaia"
+      const m = texto.match(/(\d{5})\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\-\/ ]+?)\s*-\s*Bizkaia/);
+      const cp        = m ? m[1] : '';
+      const municipio = m ? m[2].trim() : '';
+
+      let direccion = '';
+      if (m) {
+        const idx    = texto.indexOf(m[1]);
+        const previo = texto.slice(0, idx);
+        direccion = limpiar(previo.replace(nombre, '').replace(/Abierta ahora.*/i, ''));
+      }
+
+      items.push({
+        nombre,
+        direccion,
+        municipio,
+        cp,
+        url: href.startsWith('http') ? href : `https://www.farmacias.es${href}`
+      });
+    });
+
+    return items;
+  });
+
+  const unicas = dedup(listado, f => f.url);
+  console.log(`🔴 BIZKAIA: ${unicas.length} farmacias en el listado`);
+
+  if (unicas.length === 0) {
+    console.warn('🔴 BIZKAIA: listado vacío (¿cambió la estructura de farmacias.es?)');
+    return [];
+  }
+
+  // 2) Entrar en cada ficha para sacar teléfono y coordenadas
+  const resultado = [];
+  for (const f of unicas) {
+    try {
+      await page.goto(f.url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await delay(250);   // cortesía con el servidor
+
+      const detalle = await page.evaluate(() => {
+        const html = document.body.innerHTML;
+
+        // Teléfono: <a href="tel:+34XXXXXXXXX">
+        let telefono = '';
+        const telLink = document.querySelector('a[href^="tel:"]');
+        if (telLink) {
+          const m = (telLink.getAttribute('href') || '').match(/\d{9}/);
+          telefono = m ? m[0] : '';
+        }
+
+        // Coordenadas: iframemapa1.php?lat=XX.XX&lon=YY.YY  (el & puede venir como &amp;)
+        let lat = null, lon = null;
+        const mc = html.match(/lat=(-?\d+\.\d+)&(?:amp;)?lon=(-?\d+\.\d+)/);
+        if (mc) { lat = parseFloat(mc[1]); lon = parseFloat(mc[2]); }
+
+        return { telefono, lat, lon };
+      });
+
+      resultado.push({
+        nombre:    f.nombre,
+        direccion: f.direccion || `${f.municipio} (${f.cp})`,
+        municipio: f.municipio,
+        telefono:  detalle.telefono,
+        provincia: 'BIZKAIA',
+        lat: detalle.lat,
+        lon: detalle.lon
+      });
+    } catch (e) {
+      console.error(`   └─ Error en ${f.nombre}: ${e.message}`);
+    }
+  }
+
+  const unicos = dedup(resultado, f =>
+    `${f.nombre.toLowerCase()}|${f.municipio.toLowerCase()}`
+  );
+
+  const conTel = unicos.filter(f => f.telefono).length;
+  console.log(
+    `✅ BIZKAIA: ${unicos.length} farmacias ` +
+    `(${conTel} con teléfono, ${unicos.length - conTel} sin teléfono)`
+  );
+  return unicos;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════ *
+ *  MAIN                                                             *
  * ═══════════════════════════════════════════════════════════════ */
 
 (async () => {
   console.log('╔══════════════════════════════════════════════════╗');
-  console.log('║  SCRAPER GUARDIAS v3 — GitHub Actions            ║');
+  console.log('║  SCRAPER GUARDIAS v5 — GitHub Actions             ║');
   console.log('╚══════════════════════════════════════════════════╝');
   console.log(`Fecha: ${fechaISO()}  ·  ${new Date().toISOString()}\n`);
 
